@@ -1,3 +1,12 @@
+use std::{
+    env, fs,
+    fs::read_dir,
+    panic,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    time::Duration,
+};
+
 use clap::{Parser, Subcommand};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -29,14 +38,6 @@ use libafl_targets::{
     CmpLogObserver, COUNTERS_MAPS,
 };
 use mimalloc::MiMalloc;
-use std::{
-    env, fs,
-    fs::read_dir,
-    path::{Path, PathBuf},
-    process::Stdio,
-    time::Duration,
-};
-use std::{panic, process::Command};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -113,15 +114,32 @@ struct Cli {
     mode: Mode,
 }
 
+fn collect_files(dir: &PathBuf, out: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir)
+        .expect("failed to read directory")
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+            // skip metadata files
+            if name.ends_with(".metadata") || name.starts_with(".") {
+                continue;
+            }
+        }
+        if path.is_dir() {
+            collect_files(&path, out);
+        } else if path.is_file() {
+            out.push(path);
+        }
+    }
+}
+
 // Run the corpus without fuzzing
 fn run(input: PathBuf) {
     let files = if input.is_dir() {
-        input
-            .read_dir()
-            .expect("Unable to read dir")
-            .filter_map(core::result::Result::ok)
-            .map(|e| e.path())
-            .collect()
+        let mut res = Vec::new();
+        collect_files(&input, &mut res);
+        res
     } else {
         vec![input]
     };
