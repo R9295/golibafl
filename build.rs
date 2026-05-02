@@ -33,8 +33,7 @@ fn main() -> Result<()> {
     // Enable cgo
     env::set_var("CGO_ENABLED", "1");
 
-    let harness_path = env::var("HARNESS").unwrap();
-
+    let harness_path = "./harnesses/evm".to_string();
     //rerun_if_changed_recursive(&Path::new(harness_path.as_str()));
     //println!("cargo::rerun-if-changed={}", harness_path);
 
@@ -97,6 +96,29 @@ fn main() -> Result<()> {
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     // Tell cargo to link the static Go library
     println!("cargo:rustc-link-lib=static=harness");
+
+    // Build evm-smith and link its static library so the Go harness can resolve
+    // arbitrary_state_test / evm_byte_buffer_free at link time.
+    let evm_smith_path = env::var("EVM_SMITH_PATH").unwrap_or_else(|_| {
+        format!("{}/../evm-smith", env!("CARGO_MANIFEST_DIR"))
+    });
+    run(
+        "cargo",
+        [
+            "build",
+            "--release",
+            "--features=arbitrary",
+            "--manifest-path",
+            &format!("{}/Cargo.toml", evm_smith_path),
+        ],
+        None,
+    )?;
+    println!(
+        "cargo:rustc-link-search=native={}/target/release",
+        evm_smith_path
+    );
+    println!("cargo:rustc-link-lib=static=evm");
+    println!("cargo:rerun-if-env-changed=EVM_SMITH_PATH");
 
     // For macOS users, please add your frameworks your target depends on here.
     // This is necessary to resolve undefined symbols that may occur during linking.
