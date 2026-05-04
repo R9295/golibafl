@@ -117,7 +117,7 @@ fn main() -> Result<()> {
         "cargo:rustc-link-search=native={}/target/release",
         evm_smith_path
     );
-    println!("cargo:rustc-link-lib=static=evm");
+    println!("cargo:rustc-link-lib=static=evm_smith");
     println!("cargo:rerun-if-env-changed=EVM_SMITH_PATH");
 
     // For macOS users, please add your frameworks your target depends on here.
